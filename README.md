@@ -25,7 +25,10 @@ The game “Guess 2/3 of the Average” is implemented using multiple techniques
 - Spectate lobbies and recieve updates.
 - block players from joining if lobby full
 - Ping Pinging between server and client
-- Calculation logic
+- Full implementation of game calculation logic
+- chat with players
+- Timeout afk players
+  
 
 
 ## Badges
