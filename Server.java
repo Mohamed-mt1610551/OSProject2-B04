@@ -44,7 +44,7 @@ public class Server {
 			while (true) {
 				try {
 					pingPlayers();
-					Thread.sleep(30000); // Ping every 10 seconds
+					Thread.sleep(30000); // Ping every 30 seconds and wait for 5seconds to recieve a response
 				} catch (InterruptedException e) {
 					System.out.println("Pinging thread interrupted: " + e.getMessage());
 					break;
@@ -62,18 +62,18 @@ public class Server {
 			try {
 				// Check if player is still connected
 				if (!p.getSocket().isClosed()) {
-					p.getSocket().setSoTimeout(5000); // Set timeout for ping response
+					p.getSocket().setSoTimeout(20000); // Set timeout for ping response
 
 					// Send a ping message
 					p.getOut().writeObject("PING");
 					p.getOut().flush();
 
-					// Await a pong response
+					// Await a pong response for 5 seconds
 					String response = (String) p.getIn().readObject();
 					if (!"PONG".equals(response)) {
 						throw new IOException("Unexpected response from player " + p.getName());
-					}else{
-						System.out.println("Ping Successful "+ p.getName() +" Response: " +response);
+					} else {
+						System.out.println("Ping Successful " + p.getName() + " Response: " + response);
 					}
 				}
 			} catch (SocketTimeoutException | ClassNotFoundException e) {
@@ -269,26 +269,57 @@ public class Server {
 			Map<Player, Integer> selections = new HashMap<>();
 			double sum = 0;
 
-			for (Player player : playersBroadCast) {
-				if (player.getPoints() > 0) {
-					player.getOut().writeObject(
-							"Round " + roundNumber + " has started. Please choose a number between (0-100).");
-					player.getOut().flush();
-					int choice = (int) player.getIn().readObject();
-					player.setChoice(choice);
-					selections.put(player, choice);
-					sum += choice;
-				} else {
+			if (players.size() == 2) {
+				for (Player player : playersBroadCast) {
+					if (player.getPoints() > 0) {
+						player.getOut().writeObject(
+								"Round " + roundNumber + " has started. Please choose a number between (0-100).");
+						player.getOut().flush();
+						int choice = (int) player.getIn().readObject();
+						if (choice == 0) {
+							// if player1 chose 0 and the other player did not choose 0
+							if (players.indexOf(player) == 0 && players.get(1).getChoice() != 0) {
+								choice = players.get(1).getChoice() + 2;
+							} else if (players.indexOf(player) == 1 && players.get(0).getChoice() != 0) {
+								// if player2 chose 0 and the other player did not choose 0
+								choice = players.get(0).getChoice() + 2;
+							} else { // both picked 0 do nothing here and decrease both points down
+							}
+						}
 
-					player.getOut().writeObject("You are eliminated. Round " + roundNumber + " has begun.");
-					player.getOut().flush();
-					players.remove(player);
+						player.setChoice(choice);
+						selections.put(player, choice);
+						sum += choice;
+					} else {
+
+						player.getOut().writeObject("You are eliminated. Round " + roundNumber + " has begun.");
+						player.getOut().flush();
+						players.remove(player);
+					}
+				}
+
+			} else {// if players in the game more than 2
+				for (Player player : playersBroadCast) {
+					if (player.getPoints() > 0) {
+						player.getOut().writeObject(
+								"Round " + roundNumber + " has started. Please choose a number between (0-100).");
+						player.getOut().flush();
+						int choice = (int) player.getIn().readObject();
+						player.setChoice(choice);
+						selections.put(player, choice);
+						sum += choice;
+					} else {
+						player.getOut().writeObject("You are eliminated. Round " + roundNumber + " has begun.");
+						player.getOut().flush();
+						players.remove(player);
+					}
 				}
 			}
 
 			// Calculating results and roundWinner
 			double result = (sum / selections.size()) * (2 / 3);
 			Player winner = null;
+			Player p1 = new Player("No Winner", 0);
 			double minDiff = Double.MAX_VALUE;
 
 			for (Map.Entry<Player, Integer> entry : selections.entrySet()) {
@@ -296,6 +327,8 @@ public class Server {
 				if (diff < minDiff) {
 					minDiff = diff;
 					winner = entry.getKey();
+				} else if (result == 0) {
+					winner = p1;
 				}
 			}
 
