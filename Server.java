@@ -44,7 +44,7 @@ public class Server {
 			while (true) {
 				try {
 					pingPlayers();
-					Thread.sleep(30000); // Ping every 30 seconds and wait for 5seconds to recieve a response
+					Thread.sleep(120000); // Ping every 120 seconds and wait for 120 seconds to recieve a response
 				} catch (InterruptedException e) {
 					System.out.println("Pinging thread interrupted: " + e.getMessage());
 					break;
@@ -62,7 +62,7 @@ public class Server {
 			try {
 				// Check if player is still connected
 				if (!p.getSocket().isClosed()) {
-					p.getSocket().setSoTimeout(20000); // Set timeout for ping response
+					p.getSocket().setSoTimeout(120000); // Set timeout for ping response
 
 					// Send a ping message
 					p.getOut().writeObject("PING");
@@ -269,51 +269,33 @@ public class Server {
 			Map<Player, Integer> selections = new HashMap<>();
 			double sum = 0;
 
+			// if players in the game more than 2
+			for (Player player : playersBroadCast) {
+				if (player.getPoints() > 0) {
+					player.getOut().writeObject(
+							"Round " + roundNumber + " has started. Please choose a number between (0-100).");
+					player.getOut().flush();
+					int choice = (int) player.getIn().readObject();
+					player.setChoice(choice);
+					selections.put(player, choice);
+					sum += choice;
+				} else {
+					player.getOut().writeObject("You are eliminated. Round " + roundNumber + " has begun.");
+					player.getOut().flush();
+					players.remove(player);
+				}
+			}
+
 			if (players.size() == 2) {
-				for (Player player : playersBroadCast) {
-					if (player.getPoints() > 0) {
-						player.getOut().writeObject(
-								"Round " + roundNumber + " has started. Please choose a number between (0-100).");
-						player.getOut().flush();
-						int choice = (int) player.getIn().readObject();
-						if (choice == 0) {
-							// if player1 chose 0 and the other player did not choose 0
-							if (players.indexOf(player) == 0 && players.get(1).getChoice() != 0) {
-								choice = players.get(1).getChoice() + 2;
-							} else if (players.indexOf(player) == 1 && players.get(0).getChoice() != 0) {
-								// if player2 chose 0 and the other player did not choose 0
-								choice = players.get(0).getChoice() + 2;
-							} else { // both picked 0 do nothing here and decrease both points down
-							}
-						}
-
-						player.setChoice(choice);
-						selections.put(player, choice);
-						sum += choice;
-					} else {
-
-						player.getOut().writeObject("You are eliminated. Round " + roundNumber + " has begun.");
-						player.getOut().flush();
-						players.remove(player);
+				for (int x = 0; x <= 1; x++) {
+					if (players.get(x).getChoice() == 0 && x != 1 && players.get(1).getChoice() != 0) {
+						players.get(x).setChoice(players.get(1).getChoice() + 2);
+					} else if (players.get(x).getChoice() == 0 && x != 0 && players.get(0).getChoice() != 0) {
+						players.get(x).setChoice(players.get(0).getChoice() + 2);
 					}
+
 				}
 
-			} else {// if players in the game more than 2
-				for (Player player : playersBroadCast) {
-					if (player.getPoints() > 0) {
-						player.getOut().writeObject(
-								"Round " + roundNumber + " has started. Please choose a number between (0-100).");
-						player.getOut().flush();
-						int choice = (int) player.getIn().readObject();
-						player.setChoice(choice);
-						selections.put(player, choice);
-						sum += choice;
-					} else {
-						player.getOut().writeObject("You are eliminated. Round " + roundNumber + " has begun.");
-						player.getOut().flush();
-						players.remove(player);
-					}
-				}
 			}
 
 			// Calculating results and roundWinner
@@ -323,6 +305,12 @@ public class Server {
 			double minDiff = Double.MAX_VALUE;
 
 			for (Map.Entry<Player, Integer> entry : selections.entrySet()) {
+				int ch1 = players.stream().filter(p -> p.name == entry.getKey().getName()).findFirst().orElse(null)
+						.getChoice();
+				if (ch1 != entry.getValue())
+					players.stream().filter(p -> p.name == entry.getKey().getName()).findFirst().orElse(null)
+					.setChoice(0);
+				entry.setValue(ch1);
 				double diff = Math.abs(entry.getValue() - result);
 				if (diff < minDiff) {
 					minDiff = diff;
